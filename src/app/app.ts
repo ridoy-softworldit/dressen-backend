@@ -9,7 +9,16 @@ import config from "./config";
 import globalErrorHandler from "./middlewares/globalErrorHandler";
 import notFound from "./middlewares/notFound";
 import router from "./routes";
+
 const app: Application = express();
+
+app.use(cors({
+  origin: [
+    "https://dressen-home-ivory.vercel.app",
+    "https://dressen-admin-k4r4.vercel.app"
+  ],
+  credentials: true
+}));
 
 app.use(
   expressSession({
@@ -27,20 +36,6 @@ app.use(cookieParser());
 app.set("trust proxy", 1);
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan("dev"));
-
-app.use(
-  cors({
-    origin: [
-      "http://localhost:5173",
-      "http://localhost:3000",
-      "https://milko-home.vercel.app",
-      "https://milko-admin-panel.vercel.app",
-      "https://milko-admin-panel-iota.vercel.app",
-      "https://milko-home-bice.vercel.app",
-    ],
-    credentials: true,
-  })
-);
 
 //app routes
 app.use("/api/v1", router);
