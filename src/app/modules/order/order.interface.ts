@@ -54,10 +54,33 @@ export type TOrderedProduct = {
 
 export type TOrderInfo = {
   user: number;
+  // orderBy?: Types.ObjectId;
+  // userRole?: string;
+  // shopInfo?: Types.ObjectId;
+
+  // trackingNumber?: String;
+  // status:
+  //   | "pending"
+  //   | "processing"
+  //   | "at-local-facility"
+  //   | "delivered"
+  //   | "cancelled"
+  //   | "paid";
+  productInfo: Types.ObjectId;
+  isCancelled: boolean;
+  quantity: number;
+  selectedPrice: number;
+  // totalQuantity: number;
+  // ✅ multiple products in one order info
+  products: TOrderedProduct[];
+  totalAmount: TTotalAmount;
+  commission: TCommission;
+};
+
+export type TOrder = {
   orderBy?: Types.ObjectId;
   userRole?: string;
   shopInfo?: Types.ObjectId;
-  productInfo: Types.ObjectId;
   trackingNumber?: String;
   status:
     | "pending"
@@ -67,16 +90,6 @@ export type TOrderInfo = {
     | "cancelled"
     | "paid";
   isCancelled: boolean;
-  quantity: number;
-  selectedPrice: number;
-  totalQuantity: number;
-  // ✅ multiple products in one order info
-  products: TOrderedProduct[];
-  totalAmount: TTotalAmount;
-  commission: TCommission;
-};
-
-export type TOrder = {
   totalQuantity: number;
   orderInfo: TOrderInfo[];
   customerInfo: TCustomerInfo;

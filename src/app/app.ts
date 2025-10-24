@@ -14,8 +14,14 @@ const app: Application = express();
 
 app.use(cors({
   origin: [
+    
+    "http://localhost:3000",
     "https://dressen-home-ivory.vercel.app",
-    "https://dressen-admin-k4r4.vercel.app"
+    "https://dressen-admin-k4r4.vercel.app",
+    "http://localhost:3001",
+    "http://localhost:3003",
+  
+
   ],
   credentials: true
 }));
@@ -37,12 +43,13 @@ app.set("trust proxy", 1);
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan("dev"));
 
+
 //app routes
 app.use("/api/v1", router);
 
 //root route
 app.get("/", (req: Request, res: Response) => {
-  res.send("MegaMart server boosted on....🔥🔥🚀");
+  res.send("Dressen server boosted on....🔥🔥🚀");
 });
 
 // //global error handler

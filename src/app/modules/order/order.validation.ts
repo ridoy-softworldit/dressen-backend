@@ -104,7 +104,7 @@ const orderInfoZodSchema = z.object({
   //         : "Must be a valid ObjectId string!",
   //   })
   // ),
-  orderBy: objectIdSchema.or(z.string().default("guest")).optional(),
+  // orderBy: objectIdSchema.or(z.string().default("guest")).optional(),
   // shopInfo: objectIdSchema.or(
   //   z.string({
   //     error: (issue) =>
@@ -121,6 +121,46 @@ const orderInfoZodSchema = z.object({
           : "Must be a valid ObjectId string!",
     })
   ),
+  // trackingNumber: z.string().optional(),
+  // status: z
+  //   .enum(
+  //     [
+  //       "pending",
+  //       "processing",
+  //       "at-local-facility",
+  //       "delivered",
+  //       "cancelled",
+  //       "paid",
+  //     ],
+  //     {
+  //       message:
+  //         "Status must be one of 'pending', 'processing', 'at-local-facility', 'delivered', 'cancelled', or 'paid'",
+  //     }
+  //   )
+  //   .optional()
+  //   .default("pending"),
+  // isCancelled: z.boolean().optional().default(false),
+  quantity: z
+    .number({
+      error: (issue) =>
+        issue.input === undefined
+          ? "Quantity is required!"
+          : "Must be a number!",
+    })
+    .min(1, "Quantity must be at least 1"),
+  totalAmount: totalAmountZodSchema,
+  commission: commissionZodSchema,
+  orderNote: z.string().optional(),
+});
+
+// Main Order Validation
+export const createOrderZodSchema = z.object({
+  orderInfo: z
+    .array(orderInfoZodSchema)
+    .min(1, "At least one order info is required!"),
+
+  orderBy: objectIdSchema.or(z.string().default("guest")).optional(),
+
   trackingNumber: z.string().optional(),
   status: z
     .enum(
@@ -140,24 +180,6 @@ const orderInfoZodSchema = z.object({
     .optional()
     .default("pending"),
   isCancelled: z.boolean().optional().default(false),
-  quantity: z
-    .number({
-      error: (issue) =>
-        issue.input === undefined
-          ? "Quantity is required!"
-          : "Must be a number!",
-    })
-    .min(1, "Quantity must be at least 1"),
-  totalAmount: totalAmountZodSchema,
-  commission: commissionZodSchema,
-  orderNote: z.string().optional(),
-});
-
-// Main Order Validation
-export const createOrderZodSchema = z.object({
-  orderInfo: z
-    .array(orderInfoZodSchema)
-    .min(1, "At least one order info is required!"),
 
   customerInfo: customerInfoZodSchema,
 

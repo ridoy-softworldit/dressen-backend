@@ -3,7 +3,7 @@ import { TCategory } from "./category.interface";
 
 const iconSchema = new Schema(
   {
-    name: { type: String, required: true },
+    name: { type: String },
     url: { type: String },
   },
   { _id: false } // Prevents creating a separate _id for icon

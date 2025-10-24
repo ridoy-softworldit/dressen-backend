@@ -228,6 +228,86 @@ const orderedProductSchema = new Schema(
 
 const orderInfoSchema = new Schema<TOrderInfo>(
   {
+    // orderBy: {
+    //   type: Schema.Types.ObjectId,
+    //   ref: "user",
+    //   required: true,
+    // },
+    // userRole: {
+    //   type: String,
+    //   enum: [
+    //     "customer",
+    //     "vendor",
+    //     "sr",
+    //     "seller",
+    //     "vendor-staff",
+    //     "admin",
+    //     "admin-staff",
+    //   ],
+    //   default: "customer",
+    // },
+    // trackingNumber: {
+    //   type: String,
+    // },
+    // status: {
+    //   type: String,
+    //   enum: [
+    //     "pending",
+    //     "processing",
+    //     "at-local-facility",
+    //     "delivered",
+    //     "cancelled",
+    //     "paid",
+    //   ],
+    //   default: "pending",
+    // },
+    // isCancelled: {
+    //   type: Boolean,
+    //   default: false,
+    // },
+
+    productInfo: {
+      type: Schema.Types.ObjectId,
+      ref: "product",
+      required: true,
+    },
+
+    quantity: {
+      type: Number,
+      required: true,
+    },
+
+    selectedPrice: {
+      type: Number,
+      default: 0,
+    },
+
+    // ✅ Multiple products support
+    products: {
+      type: [orderedProductSchema],
+      required: [true, "Products are required in an order!"],
+      default: [], // ✅ Ensure it defaults to empty array
+    },
+    // totalQuantity: {
+    //   type: Number,
+    //   required: true,
+    // },
+
+    totalAmount: {
+      type: totalAmountSchema,
+      required: true,
+    },
+    commission: {
+      type: commissionSchema,
+      required: true,
+    },
+  },
+  { _id: false }
+);
+
+// Main Order Schema
+const orderSchema = new Schema<TOrder>(
+  {
     orderBy: {
       type: Schema.Types.ObjectId,
       ref: "user",
@@ -265,44 +345,10 @@ const orderInfoSchema = new Schema<TOrderInfo>(
       type: Boolean,
       default: false,
     },
-
-    productInfo: {
-      type: Schema.Types.ObjectId,
-      ref: "product",
-      required: true,
-    },
-
-    selectedPrice: {
-      type: Number,
-      default: 0,
-    },
-
-    // ✅ Multiple products support
-    products: {
-      type: [orderedProductSchema],
-      required: [true, "Products are required in an order!"],
-      default: [], // ✅ Ensure it defaults to empty array
-    },
     totalQuantity: {
       type: Number,
       required: true,
     },
-
-    totalAmount: {
-      type: totalAmountSchema,
-      required: true,
-    },
-    commission: {
-      type: commissionSchema,
-      required: true,
-    },
-  },
-  { _id: false }
-);
-
-// Main Order Schema
-const orderSchema = new Schema<TOrder>(
-  {
     orderInfo: {
       type: [orderInfoSchema],
       required: true,

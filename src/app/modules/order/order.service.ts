@@ -21,16 +21,16 @@ type OrderStatus =
  */
 const orderPopulateOptions = [
   {
-    path: "orderInfo.orderBy",
+    path: "orderBy", // ✅ Root-level field
     select: "name email",
   },
   {
-    path: "orderInfo.productInfo",
+    path: "orderInfo.productInfo", // ✅ Inside orderInfo array
     select:
       "description.name productInfo.price productInfo.salePrice productInfo.wholesalePrice featuredImg",
   },
   {
-    path: "orderInfo.products.product", // ✅ populate all products in products[]
+    path: "orderInfo.products.product", // ✅ products[] inside orderInfo[]
     select:
       "description.name productInfo.price productInfo.salePrice productInfo.wholesalePrice featuredImg",
   },
@@ -62,9 +62,7 @@ const getMyOrdersFromDB = async (
   query: Record<string, unknown>
 ) => {
   const orderQuery = new QueryBuilder(
-    OrderModel.find({ "orderInfo.orderBy": userId }).populate(
-      orderPopulateOptions
-    ),
+    OrderModel.find({ orderBy: userId }).populate(orderPopulateOptions),
     query
   )
     .search(OrderSearchableFields)
@@ -93,8 +91,10 @@ const getSingleOrderFromDB = async (id: string) => {
 // 🔹 Get Commission Summary for a User
 
 const getUserCommissionSummaryFromDB = async (userId: string) => {
+  // ✅ Fetch all orders placed by the user
   const orders = await OrderModel.find({
-    "orderInfo.orderBy": userId,
+    orderBy: userId,
+    status: "paid",
   }).populate([
     {
       path: "orderInfo.productInfo",
@@ -115,7 +115,7 @@ const getUserCommissionSummaryFromDB = async (userId: string) => {
   let totalOrders = 0;
   let completedOrders = 0;
   let pendingOrders = 0;
-  let totalQuantity = 0; // ✅ Added this
+  let totalQuantity = 0;
 
   let totalPercentageCommissionAmount = 0;
   let totalFixedCommissionAmount = 0;
@@ -126,7 +126,7 @@ const getUserCommissionSummaryFromDB = async (userId: string) => {
   let totalRetailAmount = 0;
   let totalWholesaleAmount = 0;
 
-  // Helpers
+  // ===== Helper functions =====
   const getSalePriceFromProduct = (prod: any) => {
     const sale = prod?.productInfo?.salePrice;
     const price = prod?.productInfo?.price;
@@ -150,73 +150,71 @@ const getUserCommissionSummaryFromDB = async (userId: string) => {
 
   // ===== Loop through all orders =====
   for (const order of orders) {
+    totalOrders++;
+
+    if (order.status === "paid") {
+      completedOrders++;
+    } else if (order.status === "pending") {
+      pendingOrders++;
+    }
+
+    // Loop through orderInfo array for detailed calculation
     for (const info of order.orderInfo) {
-      if (info.orderBy?.toString() !== userId) continue;
+      const qty = info.quantity || 1;
+      totalQuantity += qty;
 
-      totalOrders++;
+      // ✅ Handle single product
+      if (info.productInfo) {
+        const prod = info.productInfo as any;
 
-      if (info.status === "paid") {
-        completedOrders++;
+        const salePrice = getSalePriceFromProduct(prod);
+        const retailPrice = getRetailPriceFromProduct(prod);
+        const wholesalePrice = getWholesalePriceFromProduct(prod);
 
-        // ✅ Use totalQuantity everywhere for accurate totals
-        const qty = info.totalQuantity || info.quantity || 1;
-        totalQuantity += qty;
+        totalSaleAmount += salePrice * qty;
+        totalRetailAmount += retailPrice * qty;
+        totalWholesaleAmount += wholesalePrice * qty;
+      }
 
-        // Handle single product orderInfo.productInfo
-        if (info.productInfo) {
-          const prod = info.productInfo as any;
+      // ✅ Handle multiple products
+      if (Array.isArray(info.products) && info.products.length > 0) {
+        for (const p of info.products) {
+          const prod = (p as any).product as any;
+          const pq = (p as any).quantity || 1;
+          totalQuantity += pq;
 
-          const salePrice = getSalePriceFromProduct(prod);
-          const retailPrice = getRetailPriceFromProduct(prod);
-          const wholesalePrice = getWholesalePriceFromProduct(prod);
+          const usedSalePrice =
+            typeof (p as any).price === "number" && (p as any).price > 0
+              ? (p as any).price
+              : getSalePriceFromProduct(prod);
 
-          totalSaleAmount += salePrice * qty;
-          totalRetailAmount += retailPrice * qty;
-          totalWholesaleAmount += wholesalePrice * qty;
+          const retailPrice =
+            typeof (p as any).retailPrice === "number" &&
+            (p as any).retailPrice > 0
+              ? (p as any).retailPrice
+              : getRetailPriceFromProduct(prod);
+
+          const wholesalePrice =
+            typeof (p as any).wholesalePrice === "number" &&
+            (p as any).wholesalePrice > 0
+              ? (p as any).wholesalePrice
+              : getWholesalePriceFromProduct(prod);
+
+          totalSaleAmount += usedSalePrice * pq;
+          totalRetailAmount += retailPrice * pq;
+          totalWholesaleAmount += wholesalePrice * pq;
         }
+      }
 
-        // Handle multi-product orders
-        if (Array.isArray(info.products) && info.products.length > 0) {
-          for (const p of info.products) {
-            const prod = (p as any).product as any;
-            const pq = (p as any).quantity || 1;
-            totalQuantity += pq; // ✅ Add each sub-product quantity
-
-            const usedSalePrice =
-              typeof (p as any).price === "number" && (p as any).price > 0
-                ? (p as any).price
-                : getSalePriceFromProduct(prod);
-
-            const retailPrice =
-              typeof (p as any).retailPrice === "number" &&
-              (p as any).retailPrice > 0
-                ? (p as any).retailPrice
-                : getRetailPriceFromProduct(prod);
-
-            const wholesalePrice =
-              typeof (p as any).wholesalePrice === "number" &&
-              (p as any).wholesalePrice > 0
-                ? (p as any).wholesalePrice
-                : getWholesalePriceFromProduct(prod);
-
-            totalSaleAmount += usedSalePrice * pq;
-            totalRetailAmount += retailPrice * pq;
-            totalWholesaleAmount += wholesalePrice * pq;
-          }
-        }
-
-        // ✅ Commission calculation (use totalQuantity multiplier if needed)
-        if (info.commission?.type === "percentage") {
-          const commissionAmount = info.commission.amount || 0;
-          totalPercentageCommissionAmount += commissionAmount;
-          totalPercentageRate += info.commission.value || 0;
-          percentageCommissionCount++;
-        } else if (info.commission?.type === "fixed") {
-          const commissionAmount = info.commission.amount || 0;
-          totalFixedCommissionAmount += commissionAmount;
-        }
-      } else if (info.status === "pending") {
-        pendingOrders++;
+      // ✅ Commission calculation
+      if (info.commission?.type === "percentage") {
+        const commissionAmount = info.commission.amount || 0;
+        totalPercentageCommissionAmount += commissionAmount;
+        totalPercentageRate += info.commission.value || 0;
+        percentageCommissionCount++;
+      } else if (info.commission?.type === "fixed") {
+        const commissionAmount = info.commission.amount || 0;
+        totalFixedCommissionAmount += commissionAmount;
       }
     }
   }
@@ -233,7 +231,7 @@ const getUserCommissionSummaryFromDB = async (userId: string) => {
     totalOrders,
     completedOrders,
     pendingOrders,
-    totalQuantity, // ✅ Added output field
+    totalQuantity,
     totalCommission,
     totalPercentageCommissionAmount,
     totalFixedCommissionAmount,
@@ -245,45 +243,164 @@ const getUserCommissionSummaryFromDB = async (userId: string) => {
 };
 
 /**
- * ✅ Get Overall Order Summary
+ * ✅ Get Overall Order Summary (based on new Order Schema)
+ * - Root-level: orderBy, userRole, status, totalAmount
+ * - Nested: orderInfo[].totalAmount.total (for product-level totals)
  */
 // const getOrderSummaryFromDB = async () => {
-//   const summary = await OrderModel.aggregate([
-//     { $unwind: "$orderInfo" }, // flatten each order item
-
+//   // Step 1️⃣: Aggregate top-level order stats
+//   const rootSummary = await OrderModel.aggregate([
 //     {
 //       $group: {
 //         _id: null,
-
 //         totalOrders: { $sum: 1 },
 //         pendingOrders: {
-//           $sum: {
-//             $cond: [{ $eq: ["$orderInfo.status", "pending"] }, 1, 0],
-//           },
+//           $sum: { $cond: [{ $eq: ["$status", "pending"] }, 1, 0] },
 //         },
 //         paidOrders: {
+//           $sum: { $cond: [{ $eq: ["$status", "paid"] }, 1, 0] },
+//         },
+//         totalCancelledOrders: {
+//           $sum: { $cond: [{ $eq: ["$status", "cancelled"] }, 1, 0] },
+//         },
+//         srCanceledOrders: {
 //           $sum: {
-//             $cond: [{ $eq: ["$orderInfo.status", "paid"] }, 1, 0],
+//             $cond: [
+//               {
+//                 $and: [
+//                   { $eq: ["$status", "cancelled"] },
+//                   { $eq: ["$userRole", "sr"] },
+//                 ],
+//               },
+//               1,
+//               0,
+//             ],
+//           },
+//         },
+//         customerCanceledOrders: {
+//           $sum: {
+//             $cond: [
+//               {
+//                 $and: [
+//                   { $eq: ["$status", "cancelled"] },
+//                   { $eq: ["$userRole", "customer"] },
+//                 ],
+//               },
+//               1,
+//               0,
+//             ],
+//           },
+//         },
+//         todayTotalPaidOrders: {
+//           $sum: {
+//             $cond: [
+//               {
+//                 $and: [
+//                   { $eq: ["$status", "paid"] },
+//                   {
+//                     $eq: [
+//                       {
+//                         $dateToString: {
+//                           format: "%Y-%m-%d",
+//                           date: "$createdAt",
+//                         },
+//                       },
+//                       new Date().toISOString().split("T")[0],
+//                     ],
+//                   },
+//                 ],
+//               },
+//               1,
+//               0,
+//             ],
+//           },
+//         },
+//         todayTotalCanceledOrders: {
+//           $sum: {
+//             $cond: [
+//               {
+//                 $and: [
+//                   { $eq: ["$status", "cancelled"] },
+//                   {
+//                     $eq: [
+//                       {
+//                         $dateToString: {
+//                           format: "%Y-%m-%d",
+//                           date: "$createdAt",
+//                         },
+//                       },
+//                       new Date().toISOString().split("T")[0],
+//                     ],
+//                   },
+//                 ],
+//               },
+//               1,
+//               0,
+//             ],
+//           },
+//         },
+//         todayTotalSrOrders: {
+//           $sum: {
+//             $cond: [
+//               {
+//                 $and: [
+//                   { $eq: ["$userRole", "sr"] },
+//                   {
+//                     $eq: [
+//                       {
+//                         $dateToString: {
+//                           format: "%Y-%m-%d",
+//                           date: "$createdAt",
+//                         },
+//                       },
+//                       new Date().toISOString().split("T")[0],
+//                     ],
+//                   },
+//                 ],
+//               },
+//               1,
+//               0,
+//             ],
+//           },
+//         },
+//         todayTotalCustomerOrders: {
+//           $sum: {
+//             $cond: [
+//               {
+//                 $and: [
+//                   { $eq: ["$userRole", "customer"] },
+//                   {
+//                     $eq: [
+//                       {
+//                         $dateToString: {
+//                           format: "%Y-%m-%d",
+//                           date: "$createdAt",
+//                         },
+//                       },
+//                       new Date().toISOString().split("T")[0],
+//                     ],
+//                   },
+//                 ],
+//               },
+//               1,
+//               0,
+//             ],
 //           },
 //         },
 //         customerOrders: {
-//           $sum: {
-//             $cond: [{ $eq: ["$orderInfo.userRole", "customer"] }, 1, 0],
-//           },
+//           $sum: { $cond: [{ $eq: ["$userRole", "customer"] }, 1, 0] },
 //         },
 //         srOrders: {
-//           $sum: {
-//             $cond: [{ $eq: ["$orderInfo.userRole", "sr"] }, 1, 0],
-//           },
+//           $sum: { $cond: [{ $eq: ["$userRole", "sr"] }, 1, 0] },
 //         },
-
-//         totalOrderSaleAmount: { $sum: "$totalAmount" },
-
+//         totalOrderSaleAmount: {
+//           $sum: { $ifNull: ["$totalAmount", 0] },
+//         },
 //         totalPendingSale: {
 //           $sum: {
 //             $cond: [
-//               { $eq: ["$orderInfo.status", "pending"] },
-//               "$orderInfo.totalAmount.total",
+//               { $eq: ["$status", "pending"] },
+//               { $ifNull: ["$totalAmount", 0] },
 //               0,
 //             ],
 //           },
@@ -291,248 +408,377 @@ const getUserCommissionSummaryFromDB = async (userId: string) => {
 //         totalPaidOrderSaleAmount: {
 //           $sum: {
 //             $cond: [
-//               { $eq: ["$orderInfo.status", "paid"] },
-//               "$orderInfo.totalAmount.total",
+//               { $eq: ["$status", "paid"] },
+//               { $ifNull: ["$totalAmount", 0] },
 //               0,
 //             ],
 //           },
 //         },
 //       },
 //     },
+//   ]);
+
+//   // Step 2️⃣: Aggregate nested product-level orderInfo totals (for accuracy)
+//   const nestedSummary = await OrderModel.aggregate([
+//     { $unwind: "$orderInfo" },
 //     {
-//       $project: {
-//         _id: 0,
-//         totalOrders: 1,
-//         pendingOrders: 1,
-//         paidOrders: 1,
-//         customerOrders: 1,
-//         srOrders: 1,
-//         totalOrderSaleAmount: 1,
-//         totalPendingSale: 1,
-//         totalPaidOrderSaleAmount: 1,
+//       $group: {
+//         _id: null,
+//         totalItemsSold: { $sum: "$orderInfo.quantity" },
+//         totalProductSale: {
+//           $sum: { $ifNull: ["$orderInfo.totalAmount.total", 0] },
+//         },
 //       },
 //     },
 //   ]);
 
-//   return (
-//     summary[0] || {
-//       totalOrders: 0,
-//       pendingOrders: 0,
-//       paidOrders: 0,
-//       customerOrders: 0,
-//       srOrders: 0,
-//       totalOrderSaleAmount: 0,
-//       totalPendingSale: 0,
-//       totalPaidOrderSaleAmount: 0,
-//     }
-//   );
+//   // Step 3️⃣: Combine both safely
+//   return {
+//     totalOrders: rootSummary[0]?.totalOrders || 0,
+//     pendingOrders: rootSummary[0]?.pendingOrders || 0,
+//     paidOrders: rootSummary[0]?.paidOrders || 0,
+//     customerOrders: rootSummary[0]?.customerOrders || 0,
+//     canceledOrders: rootSummary[0]?.totalCancelledOrders || 0,
+//     srCanceledOrders: rootSummary[0]?.srCanceledOrders || 0,
+//     customerCanceledOrders: rootSummary[0]?.customerCanceledOrders || 0,
+//     todayTotalPaidOrders: rootSummary[0]?.todayTotalPaidOrders || 0,
+//     todayTotalCanceledOrders: rootSummary[0]?.todayTotalCanceledOrders || 0,
+//     todayTotalSrOrders: rootSummary[0]?.todayTotalSrOrders || 0,
+//     todayTotalCustomerOrders: rootSummary[0]?.todayTotalCustomerOrders || 0,
+//     srOrders: rootSummary[0]?.srOrders || 0,
+//     totalOrderSaleAmount: rootSummary[0]?.totalOrderSaleAmount || 0,
+//     totalPendingSale: rootSummary[0]?.totalPendingSale || 0,
+//     totalPaidOrderSaleAmount: rootSummary[0]?.totalPaidOrderSaleAmount || 0,
+//     totalItemsSold: nestedSummary[0]?.totalItemsSold || 0,
+//     totalProductSale: nestedSummary[0]?.totalProductSale || 0,
+//   };
 // };
 
-// const createOrderIntoDB = async (payload: TOrder) => {
-//   if (payload) {
-//     payload.orderInfo.forEach((order) => {
-//       order.trackingNumber = nanoid();
+const getOrderSummaryFromDB = async ({
+  startDate,
+  endDate,
+}: {
+  startDate?: string;
+  endDate?: string;
+}) => {
+  try {
+    // ✅ Convert and validate date range
+    const start =
+      startDate && !isNaN(new Date(startDate).getTime())
+        ? new Date(startDate)
+        : new Date(0);
+    const end =
+      endDate && !isNaN(new Date(endDate).getTime())
+        ? new Date(endDate)
+        : new Date();
 
-//       // ✅ Handle user role fallback
-//       if (!order.userRole) {
-//         order.userRole = "customer"; // Default role if not provided
-//       }
+    // ✅ Step 0️⃣: Apply timezone-safe date filter
+    const matchStage = {
+      $match: {
+        createdAt: { $gte: start, $lte: end },
+      },
+    };
 
-//       // Calculate commission if not already included
-//       if (order.commission && order.totalAmount) {
-//         if (order.commission.type === "percentage") {
-//           order.commission.amount =
-//             (order.totalAmount.total * order.commission.value) / 100;
-//         } else if (order.commission.type === "fixed") {
-//           order.commission.amount = order.commission.value;
-//         }
-//       }
-//     });
-//   }
-
-//   const result = await OrderModel.create(payload);
-//   return result;
-// };
-
-// const createOrderIntoDB = async (payload: TOrder) => {
-//   if (payload && payload.orderInfo) {
-//     for (const orderInfo of payload.orderInfo) {
-//       // Generate tracking number
-//       orderInfo.trackingNumber = nanoid();
-
-//       // Set default user role
-//       if (!orderInfo.userRole) {
-//         orderInfo.userRole = "customer";
-//       }
-
-//       // ✅ FIX: Ensure products array exists and has data
-//       if (!orderInfo.products || orderInfo.products.length === 0) {
-//         // If no products in array, create one from the legacy productInfo field
-//         if (orderInfo.productInfo) {
-//           orderInfo.products = [
-//             {
-//               product: orderInfo.productInfo,
-//               quantity: orderInfo.quantity || 1,
-//               price: orderInfo.totalAmount?.subTotal || 0,
-//               subtotal: orderInfo.totalAmount?.subTotal || 0,
-//               // Add other product fields as needed
-//             },
-//           ];
-//         }
-//       }
-
-//       // ✅ FIX: Calculate subtotal for each product in the products array
-//       if (orderInfo.products && orderInfo.products.length > 0) {
-//         for (const product of orderInfo.products) {
-//           // If wholeSalePrice is provided, use it; otherwise use regular price
-//           const unitPrice = product.wholeSalePrice || product.price;
-//           product.subtotal = unitPrice * product.quantity;
-//         }
-//       }
-
-//       // Calculate commission
-//       if (orderInfo.commission && orderInfo.totalAmount) {
-//         if (orderInfo.commission.type === "percentage") {
-//           orderInfo.commission.amount =
-//             (orderInfo.totalAmount.total * orderInfo.commission.value) / 100;
-//         } else if (orderInfo.commission.type === "fixed") {
-//           orderInfo.commission.amount = orderInfo.commission.value;
-//         }
-//       }
-//     }
-//   }
-
-//   const result = await OrderModel.create(payload);
-//   return result;
-// };
-
-/**
- * ✅ Get Overall Order Summary (fixed without double-counting)
- */
-const getOrderSummaryFromDB = async () => {
-  // Step 1: Calculate all orderInfo-level data (status, userRole, etc.)
-  const summary = await OrderModel.aggregate([
-    { $unwind: "$orderInfo" },
-    {
-      $group: {
-        _id: null,
-        totalOrders: { $addToSet: "$_id" }, // to count unique orders later
-        pendingOrders: {
-          $sum: {
-            $cond: [{ $eq: ["$orderInfo.status", "pending"] }, 1, 0],
-          },
-        },
-        paidOrders: {
-          $sum: {
-            $cond: [{ $eq: ["$orderInfo.status", "paid"] }, 1, 0],
-          },
-        },
-        customerOrders: {
-          $sum: {
-            $cond: [{ $eq: ["$orderInfo.userRole", "customer"] }, 1, 0],
-          },
-        },
-        srOrders: {
-          $sum: {
-            $cond: [{ $eq: ["$orderInfo.userRole", "sr"] }, 1, 0],
-          },
-        },
-        // ✅ calculate only paid and pending totals from orderInfo
-        totalPendingSale: {
-          $sum: {
-            $cond: [
-              { $eq: ["$orderInfo.status", "pending"] },
-              { $ifNull: ["$orderInfo.totalAmount.total", 0] },
-              0,
-            ],
-          },
-        },
-        totalPaidOrderSaleAmount: {
-          $sum: {
-            $cond: [
-              { $eq: ["$orderInfo.status", "paid"] },
-              { $ifNull: ["$orderInfo.totalAmount.total", 0] },
-              0,
-            ],
+    // ✅ Step 1️⃣: Project date in Asia/Dhaka timezone
+    const projectStage = {
+      $addFields: {
+        createdDate: {
+          $dateToString: {
+            date: "$createdAt",
+            format: "%Y-%m-%d",
+            timezone: "Asia/Dhaka",
           },
         },
       },
-    },
-    {
-      $project: {
-        totalOrdersCount: { $size: "$totalOrders" },
-        pendingOrders: 1,
-        paidOrders: 1,
-        customerOrders: 1,
-        srOrders: 1,
-        totalPendingSale: 1,
-        totalPaidOrderSaleAmount: 1,
-      },
-    },
-  ]);
+    };
 
-  // Step 2: Get the totalOrderSaleAmount separately (root-level total)
-  const rootTotal = await OrderModel.aggregate([
-    {
-      $group: {
-        _id: null,
-        totalOrderSaleAmount: { $sum: { $ifNull: ["$totalAmount", 0] } },
-      },
-    },
-  ]);
+    // ✅ Step 2️⃣: Apply date filter conditionally
+    const dateFilterStage =
+      startDate || endDate
+        ? {
+            $match: {
+              createdDate: {
+                $gte: startDate ? startDate : "1970-01-01",
+                $lte: endDate ? endDate : "2100-12-31",
+              },
+            },
+          }
+        : null;
 
-  // Return constructed summary using safe optional chaining and defaults
-  return {
-    totalOrders: summary[0]?.totalOrdersCount || 0,
-    pendingOrders: summary[0]?.pendingOrders || 0,
-    paidOrders: summary[0]?.paidOrders || 0,
-    customerOrders: summary[0]?.customerOrders || 0,
-    srOrders: summary[0]?.srOrders || 0,
-    totalOrderSaleAmount: rootTotal[0]?.totalOrderSaleAmount || 0,
-    totalPendingSale: summary[0]?.totalPendingSale || 0,
-    totalPaidOrderSaleAmount: summary[0]?.totalPaidOrderSaleAmount || 0,
-  };
+    // ✅ Step 3️⃣: Root-level aggregation
+    const rootSummary = await OrderModel.aggregate([
+      projectStage,
+      ...(dateFilterStage ? [dateFilterStage] : []),
+      {
+        $group: {
+          _id: null,
+          totalOrders: { $sum: 1 },
+          pendingOrders: {
+            $sum: { $cond: [{ $eq: ["$status", "pending"] }, 1, 0] },
+          },
+          paidOrders: {
+            $sum: { $cond: [{ $eq: ["$status", "paid"] }, 1, 0] },
+          },
+          totalCancelledOrders: {
+            $sum: { $cond: [{ $eq: ["$status", "cancelled"] }, 1, 0] },
+          },
+          srCanceledOrders: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ["$status", "cancelled"] },
+                    { $eq: ["$userRole", "sr"] },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+          customerCanceledOrders: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ["$status", "cancelled"] },
+                    { $eq: ["$userRole", "customer"] },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+          todayTotalPaidOrders: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ["$status", "paid"] },
+                    {
+                      $eq: [
+                        {
+                          $dateToString: {
+                            format: "%Y-%m-%d",
+                            date: "$createdAt",
+                            timezone: "Asia/Dhaka",
+                          },
+                        },
+                        new Date().toISOString().split("T")[0],
+                      ],
+                    },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+          todayTotalCanceledOrders: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ["$status", "cancelled"] },
+                    {
+                      $eq: [
+                        {
+                          $dateToString: {
+                            format: "%Y-%m-%d",
+                            date: "$createdAt",
+                            timezone: "Asia/Dhaka",
+                          },
+                        },
+                        new Date().toISOString().split("T")[0],
+                      ],
+                    },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+          todayTotalSrOrders: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ["$userRole", "sr"] },
+                    {
+                      $eq: [
+                        {
+                          $dateToString: {
+                            format: "%Y-%m-%d",
+                            date: "$createdAt",
+                            timezone: "Asia/Dhaka",
+                          },
+                        },
+                        new Date().toISOString().split("T")[0],
+                      ],
+                    },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+          todayTotalCustomerOrders: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ["$userRole", "customer"] },
+                    {
+                      $eq: [
+                        {
+                          $dateToString: {
+                            format: "%Y-%m-%d",
+                            date: "$createdAt",
+                            timezone: "Asia/Dhaka",
+                          },
+                        },
+                        new Date().toISOString().split("T")[0],
+                      ],
+                    },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+          customerOrders: {
+            $sum: { $cond: [{ $eq: ["$userRole", "customer"] }, 1, 0] },
+          },
+          srOrders: {
+            $sum: { $cond: [{ $eq: ["$userRole", "sr"] }, 1, 0] },
+          },
+          totalOrderSaleAmount: {
+            $sum: { $ifNull: ["$totalAmount", 0] },
+          },
+          totalPendingSale: {
+            $sum: {
+              $cond: [
+                { $eq: ["$status", "pending"] },
+                { $ifNull: ["$totalAmount", 0] },
+                0,
+              ],
+            },
+          },
+          totalPaidOrderSaleAmount: {
+            $sum: {
+              $cond: [
+                { $eq: ["$status", "paid"] },
+                { $ifNull: ["$totalAmount", 0] },
+                0,
+              ],
+            },
+          },
+        },
+      },
+    ]);
+
+    // ✅ Step 4️⃣: Nested product-level summary
+    const nestedSummary = await OrderModel.aggregate([
+      projectStage,
+      ...(dateFilterStage ? [dateFilterStage] : []),
+      { $unwind: { path: "$orderInfo", preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: null,
+          totalItemsSold: { $sum: { $ifNull: ["$orderInfo.quantity", 0] } },
+          totalProductSale: {
+            $sum: { $ifNull: ["$orderInfo.totalAmount.total", 0] },
+          },
+        },
+      },
+    ]);
+
+    // ✅ Step 5️⃣: Combine all results
+    return {
+      totalOrders: rootSummary[0]?.totalOrders || 0,
+      pendingOrders: rootSummary[0]?.pendingOrders || 0,
+      paidOrders: rootSummary[0]?.paidOrders || 0,
+      canceledOrders: rootSummary[0]?.totalCancelledOrders || 0,
+      srCanceledOrders: rootSummary[0]?.srCanceledOrders || 0,
+      customerCanceledOrders: rootSummary[0]?.customerCanceledOrders || 0,
+      todayTotalPaidOrders: rootSummary[0]?.todayTotalPaidOrders || 0,
+      todayTotalCanceledOrders: rootSummary[0]?.todayTotalCanceledOrders || 0,
+      todayTotalSrOrders: rootSummary[0]?.todayTotalSrOrders || 0,
+      todayTotalCustomerOrders: rootSummary[0]?.todayTotalCustomerOrders || 0,
+      customerOrders: rootSummary[0]?.customerOrders || 0,
+      srOrders: rootSummary[0]?.srOrders || 0,
+      totalOrderSaleAmount: rootSummary[0]?.totalOrderSaleAmount || 0,
+      totalPendingSale: rootSummary[0]?.totalPendingSale || 0,
+      totalPaidOrderSaleAmount: rootSummary[0]?.totalPaidOrderSaleAmount || 0,
+      totalItemsSold: nestedSummary[0]?.totalItemsSold || 0,
+      totalProductSale: nestedSummary[0]?.totalProductSale || 0,
+    };
+  } catch (error) {
+    console.error("Order Summary Error:", error);
+    return {
+      totalOrders: 0,
+      pendingOrders: 0,
+      paidOrders: 0,
+      canceledOrders: 0,
+      srCanceledOrders: 0,
+      customerCanceledOrders: 0,
+      todayTotalPaidOrders: 0,
+      todayTotalCanceledOrders: 0,
+      todayTotalSrOrders: 0,
+      todayTotalCustomerOrders: 0,
+      customerOrders: 0,
+      srOrders: 0,
+      totalOrderSaleAmount: 0,
+      totalPendingSale: 0,
+      totalPaidOrderSaleAmount: 0,
+      totalItemsSold: 0,
+      totalProductSale: 0,
+    };
+  }
 };
 
 const createOrderIntoDB = async (payload: TOrder) => {
   if (payload) {
     let totalQuantity = 0;
 
-    payload.orderInfo.forEach((order) => {
-      // 🔹 Generate tracking number
-      order.trackingNumber = nanoid();
+    // 🔹 Generate tracking number for the whole order
+    payload.trackingNumber = nanoid();
 
-      // 🔹 Fallback user role
-      if (!order.userRole) {
-        order.userRole = "customer";
+    // 🔹 Default role
+    if (!payload.userRole) {
+      payload.userRole = "customer";
+    }
+
+    // 🔹 Loop through orderInfo array for calculations
+    payload.orderInfo.forEach((item) => {
+      // ✅ Default selectedPrice
+      if (item.selectedPrice === undefined || item.selectedPrice === null) {
+        item.selectedPrice = 0;
       }
 
-      // 🔹 Default selectedPrice (if not provided) — use a numeric default to match the type
-      if (order.selectedPrice === undefined || order.selectedPrice === null) {
-        order.selectedPrice = 0;
-      }
+      // ✅ Sum up total quantity
+      totalQuantity += item.quantity || 0;
 
-      // 🔹 Sum up quantities for totalQuantity
-      if (order.quantity) {
-        totalQuantity += order.quantity;
-      }
-
-      // 🔹 Calculate commission if applicable
-      if (order.commission && order.totalAmount) {
-        if (order.commission.type === "percentage") {
-          order.commission.amount =
-            (order.totalAmount.total * order.commission.value) / 100;
-        } else if (order.commission.type === "fixed") {
-          order.commission.amount = order.commission.value;
+      // ✅ Commission calculation
+      if (item.commission && item.totalAmount) {
+        if (item.commission.type === "percentage") {
+          item.commission.amount =
+            (item.totalAmount.total * item.commission.value) / 100;
+        } else if (item.commission.type === "fixed") {
+          item.commission.amount = item.commission.value;
         }
       }
     });
 
-    // 🔹 Assign totalQuantity to main order payload
+    // ✅ Assign computed total quantity to main order
     payload.totalQuantity = totalQuantity;
   }
 
-  // 🔹 Create order in DB
+  // ✅ Save the order
   const result = await OrderModel.create(payload);
   return result;
 };
@@ -550,6 +796,99 @@ const updateOrderInDB = async (id: string, payload: Partial<TOrder>) => {
 
 //  Update Order Status (Dedicated Route)
 
+// const updateOrderStatusInDB = async (id: string, status: OrderStatus) => {
+//   const order = await OrderModel.findById(id).populate("orderInfo.productInfo");
+
+//   if (!order) {
+//     throw new AppError(httpStatus.NOT_FOUND, "Order not found!");
+//   }
+
+//   if (!order.orderInfo || order.orderInfo.length === 0) {
+//     throw new AppError(httpStatus.BAD_REQUEST, "Order info is missing!");
+//   }
+
+//   // ✅ Update all items’ status
+//   order.orderInfo.forEach((item) => {
+//     item.status = status;
+//   });
+
+//   // ✅ When order is marked as PAID
+//   if (status === "paid") {
+//     for (const item of order.orderInfo) {
+//       const product = item.productInfo as any;
+
+//       if (product) {
+//         // 🧩 Determine which quantity field to use
+//         const orderQty =
+//           item.totalQuantity && item.totalQuantity > 0
+//             ? item.totalQuantity
+//             : item.quantity || 0;
+
+//         if (orderQty <= 0) {
+//           throw new AppError(
+//             httpStatus.BAD_REQUEST,
+//             `Invalid order quantity for "${
+//               product.description?.name || product.name
+//             }".`
+//           );
+//         }
+
+//         // 🟢 Check and reduce product stock
+//         if (product.quantity < orderQty) {
+//           throw new AppError(
+//             httpStatus.BAD_REQUEST,
+//             `Not enough stock for "${
+//               product.description?.name || product.name
+//             }". Only ${product.quantity} left.`
+//           );
+//         }
+
+//         // ✅ Deduct the quantity from product stock
+//         product.quantity -= orderQty;
+
+//         await ProductModel.findByIdAndUpdate(product._id, {
+//           quantity: product.quantity,
+//         });
+
+//         // 🧮 Apply commission (only once)
+//         if (!item.commission.amount && item.commission.value) {
+//           const commissionRate =
+//             item.commission.type === "percentage"
+//               ? item.commission.value / 100
+//               : 0;
+
+//           const commissionAmount =
+//             item.commission.type === "percentage"
+//               ? item.totalAmount.subTotal * commissionRate
+//               : item.commission.value;
+
+//           item.commission.amount = commissionAmount;
+//         }
+
+//         // 💰 Update SR’s commission balance once per paid order item
+//         if (
+//           item.orderBy?._id &&
+//           item.userRole === "sr" &&
+//           item.commission?.amount &&
+//           !item.commission.isAddedToBalance
+//         ) {
+//           await UserModel.findByIdAndUpdate(
+//             item.orderBy._id,
+//             { $inc: { commissionBalance: item.commission.amount || 0 } },
+//             { new: true }
+//           );
+
+//           item.commission.isAddedToBalance = true;
+//         }
+//       }
+//     }
+//   }
+
+//   await order.save();
+//   return order;
+// };
+
+// ✅ Update Order Status
 const updateOrderStatusInDB = async (id: string, status: OrderStatus) => {
   const order = await OrderModel.findById(id).populate("orderInfo.productInfo");
 
@@ -557,26 +896,16 @@ const updateOrderStatusInDB = async (id: string, status: OrderStatus) => {
     throw new AppError(httpStatus.NOT_FOUND, "Order not found!");
   }
 
-  if (!order.orderInfo || order.orderInfo.length === 0) {
-    throw new AppError(httpStatus.BAD_REQUEST, "Order info is missing!");
-  }
+  // ✅ Update main order status
+  order.status = status;
 
-  // ✅ Update all items’ status
-  order.orderInfo.forEach((item) => {
-    item.status = status;
-  });
-
-  // ✅ When order is marked as PAID
+  // ✅ When order is PAID, update stock and commission
   if (status === "paid") {
     for (const item of order.orderInfo) {
       const product = item.productInfo as any;
 
       if (product) {
-        // 🧩 Determine which quantity field to use
-        const orderQty =
-          item.totalQuantity && item.totalQuantity > 0
-            ? item.totalQuantity
-            : item.quantity || 0;
+        const orderQty = item.quantity || 0;
 
         if (orderQty <= 0) {
           throw new AppError(
@@ -587,7 +916,7 @@ const updateOrderStatusInDB = async (id: string, status: OrderStatus) => {
           );
         }
 
-        // 🟢 Check and reduce product stock
+        // 🟢 Check and reduce stock
         if (product.quantity < orderQty) {
           throw new AppError(
             httpStatus.BAD_REQUEST,
@@ -597,43 +926,44 @@ const updateOrderStatusInDB = async (id: string, status: OrderStatus) => {
           );
         }
 
-        // ✅ Deduct the quantity from product stock
+        // ✅ Deduct quantity
         product.quantity -= orderQty;
-
         await ProductModel.findByIdAndUpdate(product._id, {
           quantity: product.quantity,
         });
 
-        // 🧮 Apply commission (only once)
-        if (!item.commission.amount && item.commission.value) {
-          const commissionRate =
-            item.commission.type === "percentage"
-              ? item.commission.value / 100
-              : 0;
-
-          const commissionAmount =
-            item.commission.type === "percentage"
-              ? item.totalAmount.subTotal * commissionRate
-              : item.commission.value;
-
-          item.commission.amount = commissionAmount;
-        }
-
-        // 💰 Update SR’s commission balance once per paid order item
+        // 💰 Apply commission if applicable
         if (
-          item.orderBy?._id &&
-          item.userRole === "sr" &&
-          item.commission?.amount &&
-          !item.commission.isAddedToBalance
+          item.commission &&
+          !item.commission.amount &&
+          item.commission.value
         ) {
-          await UserModel.findByIdAndUpdate(
-            item.orderBy._id,
-            { $inc: { commissionBalance: item.commission.amount || 0 } },
-            { new: true }
-          );
-
-          item.commission.isAddedToBalance = true;
+          if (item.commission.type === "percentage") {
+            item.commission.amount =
+              (item.totalAmount.total * item.commission.value) / 100;
+          } else {
+            item.commission.amount = item.commission.value;
+          }
         }
+      }
+    }
+
+    // ✅ Add SR commission to balance (only once per order)
+    if (order.userRole === "sr" && order.orderBy && order.orderInfo.length) {
+      let totalCommission = 0;
+
+      order.orderInfo.forEach((item) => {
+        if (item.commission?.amount) {
+          totalCommission += item.commission.amount;
+        }
+      });
+
+      if (totalCommission > 0) {
+        await UserModel.findByIdAndUpdate(
+          order.orderBy,
+          { $inc: { commissionBalance: totalCommission } },
+          { new: true }
+        );
       }
     }
   }

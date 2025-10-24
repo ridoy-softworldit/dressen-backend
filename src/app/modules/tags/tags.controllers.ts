@@ -95,10 +95,23 @@ const getStatus = catchAsync(async (req, res) => {
   });
 });
 
+const deleteTag = catchAsync(async (req, res) => {
+  const id = req.params.id;
+  const result = await tagServices.deleteTagFormDB(id);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "Tag deleted successfully!",
+    data: result,
+  });
+});
+
 export const tagControllers = {
   getAllTags,
   getSingleTag,
   createTag,
   updateTag,
   getStatus,
+  deleteTag,
 };

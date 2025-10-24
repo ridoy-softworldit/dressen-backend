@@ -32,4 +32,6 @@ router.patch(
 
 router.get("/stats/all", tagControllers.getStatus);
 
+router.delete("/delete-tag/:id", tagControllers.deleteTag);
+
 export const TagRoutes = router;

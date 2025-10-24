@@ -1,28 +1,30 @@
-import AppError from "../../errors/handleAppError";
 import httpStatus from "http-status";
-import { TagModel } from "./tags.model";
-import { TTag } from "./tags.interface";
 import { deleteImageFromCLoudinary } from "../../config/cloudinary.config";
+import AppError from "../../errors/handleAppError";
 import { QueryBuilder } from "../../utils/QueryBuilder";
 import { ProductModel } from "../product/product.model";
+import { TTag } from "./tags.interface";
+import { TagModel } from "./tags.model";
 
 const getAllTagsFromDB = async (query: Record<string, string>) => {
   const result = TagModel.find();
 
-
-  const queryBuilder = new QueryBuilder(result, query)
- const tagSearchableFields = [
-  'name',
-];
-  const allTags = queryBuilder.search(tagSearchableFields).filter().sort().paginate();
+  const queryBuilder = new QueryBuilder(result, query);
+  const tagSearchableFields = ["name"];
+  const allTags = queryBuilder
+    .search(tagSearchableFields)
+    .filter()
+    .sort()
+    .paginate();
 
   const [data, meta] = await Promise.all([
     allTags.build().exec(),
-    queryBuilder.getMeta()
-  ])
+    queryBuilder.getMeta(),
+  ]);
   return {
-    data, meta
-  }
+    data,
+    meta,
+  };
 };
 
 const getSingleTagFromDB = async (id: string) => {
@@ -45,60 +47,66 @@ const createTagOnDB = async (payload: TTag) => {
   return result;
 };
 
-
-const updateTagOnDB = async (id: string,payload: TTag) => {
+const updateTagOnDB = async (id: string, payload: TTag) => {
   const isTagExists = await TagModel.findById(id);
 
   if (!isTagExists) {
-    throw new AppError(httpStatus.CONFLICT, 'Tag dose not Exists!');
+    throw new AppError(httpStatus.CONFLICT, "Tag dose not Exists!");
   }
-
 
   const result = await TagModel.findByIdAndUpdate(id, payload, {
     new: true,
-    runValidators: true
-  })
+    runValidators: true,
+  });
 
   if (payload.deletedImage) {
-    await deleteImageFromCLoudinary(payload.deletedImage)
+    await deleteImageFromCLoudinary(payload.deletedImage);
   }
-
-
 
   return result;
 };
 
-
 export const getStatus = async () => {
   const totalTags = await TagModel.countDocuments();
   const taggedProducts = await ProductModel.countDocuments({
-    'brandAndCategories.tags.0': { $exists: true },
+    "brandAndCategories.tags.0": { $exists: true },
   });
   const tagTypesAgg = await TagModel.aggregate([
-    { $match: { type: { $exists: true, $ne: '' } } },
-    { $group: { _id: '$type', count: { $sum: 1 } } },
-    { $project: { _id: 0, name: '$_id', count: 1 } },
+    { $match: { type: { $exists: true, $ne: "" } } },
+    { $group: { _id: "$type", count: { $sum: 1 } } },
+    { $project: { _id: 0, name: "$_id", count: 1 } },
   ]);
 
-   const mostUsedTagAgg = await ProductModel.aggregate([
-     { $unwind: '$brandAndCategories.tags' },
-     { $group: { _id: '$brandAndCategories.tags', count: { $sum: 1 } } },
-     { $sort: { count: -1 } },
-     { $limit: 1 },
-     {
-       $lookup: {
-         from: 'tags',
-         localField: '_id',
-         foreignField: '_id',
-         as: 'tag',
-       },
-     },
-     { $unwind: '$tag' },
-     { $project: { _id: 0, name: '$tag.name', count: 1 } },
-   ]);
+  const mostUsedTagAgg = await ProductModel.aggregate([
+    { $unwind: "$brandAndCategories.tags" },
+    { $group: { _id: "$brandAndCategories.tags", count: { $sum: 1 } } },
+    { $sort: { count: -1 } },
+    { $limit: 1 },
+    {
+      $lookup: {
+        from: "tags",
+        localField: "_id",
+        foreignField: "_id",
+        as: "tag",
+      },
+    },
+    { $unwind: "$tag" },
+    { $project: { _id: 0, name: "$tag.name", count: 1 } },
+  ]);
 
+  return { totalTags, tagTypesAgg, taggedProducts, mostUsedTagAgg };
+};
 
-  return { totalTags, tagTypesAgg, taggedProducts,mostUsedTagAgg };
+const deleteTagFormDB = async (id: string) => {
+  const isTagExists = await TagModel.findById(id);
+
+  if (!isTagExists) {
+    throw new AppError(httpStatus.CONFLICT, "Tag dose not Exists!");
+  }
+
+  const result = await TagModel.findByIdAndDelete(id);
+
+  return result;
 };
 export const tagServices = {
   getAllTagsFromDB,
@@ -106,4 +114,5 @@ export const tagServices = {
   createTagOnDB,
   updateTagOnDB,
   getStatus,
+  deleteTagFormDB,
 };
