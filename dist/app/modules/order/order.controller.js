@@ -49,8 +49,25 @@ const getSingleOrder = (0, catchAsync_1.default)((req, res) => __awaiter(void 0,
 /**
  * ✅ Get Order Summary Controller
  */
+// const getOrderSummary = catchAsync(async (req, res) => {
+//   const summary = await orderServices.getOrderSummaryFromDB();
+//   sendResponse(res, {
+//     success: true,
+//     statusCode: httpStatus.OK,
+//     message: "Order summary fetched successfully",
+//     data: summary,
+//   });
+// });
+/**
+ * ✅ Get Order Summary Controller with Date Filter
+ * Query params: ?startDate=2025-01-01&endDate=2025-10-17
+ */
 const getOrderSummary = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const summary = yield order_service_1.orderServices.getOrderSummaryFromDB();
+    const { startDate, endDate } = req.query;
+    const summary = yield order_service_1.orderServices.getOrderSummaryFromDB({
+        startDate,
+        endDate,
+    });
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_1.default.OK,

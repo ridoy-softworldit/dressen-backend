@@ -18,6 +18,7 @@ app.use(cors({
     "http://localhost:3000",
     "https://dressen-home-ivory.vercel.app",
     "https://dressen-admin-k4r4.vercel.app",
+    "https://dressen-admin-panel-gamma.vercel.app",
     "http://localhost:3001",
     "http://localhost:3003",
   

@@ -21,4 +21,5 @@ router.patch("/update-tag/:id", multer_config_1.multerUpload.fields([
     { name: "icon", maxCount: 1 },
 ]), (0, validateRequest_1.default)(tags_validations_1.updateTagZodSchema), tags_controllers_1.tagControllers.updateTag);
 router.get("/stats/all", tags_controllers_1.tagControllers.getStatus);
+router.delete("/delete-tag/:id", tags_controllers_1.tagControllers.deleteTag);
 exports.TagRoutes = router;

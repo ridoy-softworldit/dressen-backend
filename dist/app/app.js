@@ -17,8 +17,11 @@ const routes_1 = __importDefault(require("./routes"));
 const app = (0, express_1.default)();
 app.use((0, cors_1.default)({
     origin: [
+        "http://localhost:3000",
         "https://dressen-home-ivory.vercel.app",
-        "https://dressen-admin-k4r4.vercel.app"
+        "https://dressen-admin-k4r4.vercel.app",
+        "http://localhost:3001",
+        "http://localhost:3003",
     ],
     credentials: true
 }));
@@ -39,7 +42,7 @@ app.use((0, morgan_1.default)("dev"));
 app.use("/api/v1", routes_1.default);
 //root route
 app.get("/", (req, res) => {
-    res.send("MegaMart server boosted on....🔥🔥🚀");
+    res.send("Dressen server boosted on....🔥🔥🚀");
 });
 // //global error handler
 app.use(globalErrorHandler_1.default);

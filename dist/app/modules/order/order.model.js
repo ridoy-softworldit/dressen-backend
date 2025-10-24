@@ -193,6 +193,77 @@ const orderedProductSchema = new mongoose_1.Schema({
     },
 }, { _id: false });
 const orderInfoSchema = new mongoose_1.Schema({
+    // orderBy: {
+    //   type: Schema.Types.ObjectId,
+    //   ref: "user",
+    //   required: true,
+    // },
+    // userRole: {
+    //   type: String,
+    //   enum: [
+    //     "customer",
+    //     "vendor",
+    //     "sr",
+    //     "seller",
+    //     "vendor-staff",
+    //     "admin",
+    //     "admin-staff",
+    //   ],
+    //   default: "customer",
+    // },
+    // trackingNumber: {
+    //   type: String,
+    // },
+    // status: {
+    //   type: String,
+    //   enum: [
+    //     "pending",
+    //     "processing",
+    //     "at-local-facility",
+    //     "delivered",
+    //     "cancelled",
+    //     "paid",
+    //   ],
+    //   default: "pending",
+    // },
+    // isCancelled: {
+    //   type: Boolean,
+    //   default: false,
+    // },
+    productInfo: {
+        type: mongoose_1.Schema.Types.ObjectId,
+        ref: "product",
+        required: true,
+    },
+    quantity: {
+        type: Number,
+        required: true,
+    },
+    selectedPrice: {
+        type: Number,
+        default: 0,
+    },
+    // ✅ Multiple products support
+    products: {
+        type: [orderedProductSchema],
+        required: [true, "Products are required in an order!"],
+        default: [], // ✅ Ensure it defaults to empty array
+    },
+    // totalQuantity: {
+    //   type: Number,
+    //   required: true,
+    // },
+    totalAmount: {
+        type: totalAmountSchema,
+        required: true,
+    },
+    commission: {
+        type: commissionSchema,
+        required: true,
+    },
+}, { _id: false });
+// Main Order Schema
+const orderSchema = new mongoose_1.Schema({
     orderBy: {
         type: mongoose_1.Schema.Types.ObjectId,
         ref: "user",
@@ -230,36 +301,10 @@ const orderInfoSchema = new mongoose_1.Schema({
         type: Boolean,
         default: false,
     },
-    productInfo: {
-        type: mongoose_1.Schema.Types.ObjectId,
-        ref: "product",
-        required: true,
-    },
-    selectedPrice: {
-        type: Number,
-        default: 0,
-    },
-    // ✅ Multiple products support
-    products: {
-        type: [orderedProductSchema],
-        required: [true, "Products are required in an order!"],
-        default: [], // ✅ Ensure it defaults to empty array
-    },
     totalQuantity: {
         type: Number,
         required: true,
     },
-    totalAmount: {
-        type: totalAmountSchema,
-        required: true,
-    },
-    commission: {
-        type: commissionSchema,
-        required: true,
-    },
-}, { _id: false });
-// Main Order Schema
-const orderSchema = new mongoose_1.Schema({
     orderInfo: {
         type: [orderInfoSchema],
         required: true,
