@@ -42,8 +42,14 @@ const getAllProductFromDB = (query) => __awaiter(void 0, void 0, void 0, functio
         .sort()
         .paginate()
         .fields();
-    const result = yield productQuery.modelQuery;
-    return result;
+    // ✅ Execute main query for product data
+    const data = yield productQuery.modelQuery;
+    // ✅ Use built-in countTotal() from QueryBuilder
+    const meta = yield productQuery.countTotal();
+    return {
+        meta,
+        data,
+    };
 });
 const getProductsByDiscount = (...args_1) => __awaiter(void 0, [...args_1], void 0, function* (discount = 0) {
     const products = yield product_model_1.ProductModel.find({

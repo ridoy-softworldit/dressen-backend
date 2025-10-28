@@ -29,8 +29,7 @@ const categorySchema = new mongoose_1.Schema({
         required: [true, "A banner image is required to create category!"],
     },
     subCategories: {
-        type: [mongoose_1.Schema.Types.ObjectId],
-        ref: "category",
+        type: [String],
     },
 }, {
     timestamps: true,

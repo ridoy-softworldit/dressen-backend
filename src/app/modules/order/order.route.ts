@@ -14,6 +14,7 @@ router.get("/:id", orderControllers.getSingleOrder);
 
 router.get("/commission/:id", orderControllers.getUserCommissionSummary);
 
+router.get("/track/:trackingNumber", orderControllers.getOrderByTrackingNumber);
 router.post(
   "/create-order",
   validateRequest(createOrderZodSchema),

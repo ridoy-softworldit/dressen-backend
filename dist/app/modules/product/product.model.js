@@ -23,6 +23,9 @@ const brandAndCategorySchema = new mongoose_1.Schema({
         required: [true, "Tag is Required!"],
         ref: "tag",
     },
+    subcategory: {
+        type: String,
+    },
 }, { _id: false } // Prevents creating a separate _id for icon
 );
 const commissionSchema = new mongoose_1.Schema({

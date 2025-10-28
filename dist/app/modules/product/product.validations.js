@@ -14,11 +14,13 @@ const brandAndCategoryZodSchema = zod_1.z.object({
     tags: zod_1.z
         .array(zod_1.z.string({ error: () => "Tag ID must be a string!" }))
         .min(1, { message: "At least one tag is required!" }),
+    subcategory: zod_1.z.string().optional(),
 });
 const updatebrandAndCategoryZodSchema = zod_1.z.object({
     brand: zod_1.z.string(),
     categories: zod_1.z.array(zod_1.z.string({ error: () => "Category ID must be a string!" })),
     tags: zod_1.z.array(zod_1.z.string({ error: () => "Tag ID must be a string!" })),
+    subcategory: zod_1.z.string().optional(),
 });
 // description validation
 const descriptionZodSchema = zod_1.z.object({

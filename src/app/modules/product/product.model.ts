@@ -29,6 +29,9 @@ const brandAndCategorySchema = new Schema<TBrandAndCategories>(
       required: [true, "Tag is Required!"],
       ref: "tag",
     },
+    subcategory: {
+      type: String,
+    },
   },
   { _id: false } // Prevents creating a separate _id for icon
 );

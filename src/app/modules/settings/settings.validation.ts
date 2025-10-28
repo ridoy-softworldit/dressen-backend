@@ -18,6 +18,35 @@ export const createSettingsValidationSchema = z.object({
         description: z.string().optional(),
       })
       .optional(),
+    mobileMfs: z
+      .object({
+        bKash: z
+          .object({
+            bKashLogo: z.string().optional(),
+            bKashNumber: z.string().optional(),
+          })
+          .optional(),
+        nagad: z
+          .object({
+            nagadLogo: z.string().optional(),
+            nagadNumber: z.string().optional(),
+          })
+          .optional(),
+        rocket: z
+          .object({
+            rocketLogo: z.string().optional(),
+            rocketNumber: z.string().optional(),
+          })
+          .optional(),
+        upay: z
+          .object({
+            upayLogo: z.string().optional(),
+            upayNumber: z.string().optional(),
+          })
+          .optional(),
+      })
+      .optional(),
+    deliveryCharge: z.number().optional(),
     contactAndSocial: z
       .object({
         address: z.string().optional(),

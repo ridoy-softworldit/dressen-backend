@@ -2,6 +2,22 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SettingsModel = void 0;
 const mongoose_1 = require("mongoose");
+const bKashSchema = new mongoose_1.Schema({
+    bKashLogo: { type: String },
+    bKashNumber: { type: String },
+}, { _id: false });
+const nagadSchema = new mongoose_1.Schema({
+    nagadLogo: { type: String },
+    nagadNumber: { type: String },
+}, { _id: false });
+const rocketSchema = new mongoose_1.Schema({
+    rocketLogo: { type: String },
+    rocketNumber: { type: String },
+}, { _id: false });
+const upaySchema = new mongoose_1.Schema({
+    upayLogo: { type: String },
+    upayNumber: { type: String },
+}, { _id: false });
 const settingsSchema = new mongoose_1.Schema({
     enableHomepagePopup: { type: Boolean, default: false },
     popupTitle: { type: String },
@@ -24,6 +40,13 @@ const settingsSchema = new mongoose_1.Schema({
         title: { type: String },
         description: { type: String },
     },
+    mobileMfs: {
+        bKash: bKashSchema,
+        nagad: nagadSchema,
+        rocket: rocketSchema,
+        upay: upaySchema,
+    },
+    deliveryCharge: { type: Number, default: 0 },
     contactAndSocial: {
         address: { type: String },
         email: { type: String },

@@ -48,8 +48,14 @@ const getAllOrdersFromDB = (query) => __awaiter(void 0, void 0, void 0, function
         .sort()
         .paginate()
         .fields();
-    const result = yield orderQuery.modelQuery;
-    return result;
+    // ✅ Execute main query for product data
+    const data = yield orderQuery.modelQuery;
+    // ✅ Use built-in countTotal() from QueryBuilder
+    const meta = yield orderQuery.countTotal();
+    return {
+        meta,
+        data,
+    };
 });
 /**
  * ✅ Get My Orders (for logged-in user)
@@ -73,6 +79,48 @@ const getSingleOrderFromDB = (id) => __awaiter(void 0, void 0, void 0, function*
         throw new handleAppError_1.default(http_status_1.default.NOT_FOUND, "Order does not exist!");
     }
     return result;
+});
+// Add this function to your existing order.service.ts
+/**
+ * ✅ Get Order by Tracking Number (Public - no authentication required)
+ */
+const getOrderByTrackingNumberFromDB = (trackingNumber) => __awaiter(void 0, void 0, void 0, function* () {
+    const result = yield order_model_1.OrderModel.findOne({ trackingNumber }).populate([
+        {
+            path: "orderBy",
+            select: "name email",
+        },
+        {
+            path: "orderInfo.productInfo",
+            select: "description.name productInfo.price productInfo.salePrice featuredImg",
+        },
+        {
+            path: "orderInfo.products.product",
+            select: "description.name productInfo.price productInfo.salePrice featuredImg",
+        },
+    ]);
+    if (!result) {
+        throw new handleAppError_1.default(http_status_1.default.NOT_FOUND, "Order not found with this tracking number!");
+    }
+    // Format the response to show tracking status clearly
+    const orderWithTracking = {
+        _id: result._id,
+        trackingNumber: result.trackingNumber,
+        status: result.status,
+        userRole: result.userRole,
+        orderInfo: result.orderInfo.map((info) => ({
+            productInfo: info.productInfo,
+            products: info.products,
+            quantity: info.quantity,
+            selectedPrice: info.selectedPrice,
+            totalAmount: info.totalAmount,
+            commission: info.commission,
+        })),
+        customerInfo: result.customerInfo,
+        totalAmount: result.totalAmount,
+        totalQuantity: result.totalQuantity,
+    };
+    return orderWithTracking;
 });
 // 🔹 Get Commission Summary for a User
 const getUserCommissionSummaryFromDB = (userId) => __awaiter(void 0, void 0, void 0, function* () {
@@ -212,210 +260,6 @@ const getUserCommissionSummaryFromDB = (userId) => __awaiter(void 0, void 0, voi
  * - Root-level: orderBy, userRole, status, totalAmount
  * - Nested: orderInfo[].totalAmount.total (for product-level totals)
  */
-// const getOrderSummaryFromDB = async () => {
-//   // Step 1️⃣: Aggregate top-level order stats
-//   const rootSummary = await OrderModel.aggregate([
-//     {
-//       $group: {
-//         _id: null,
-//         totalOrders: { $sum: 1 },
-//         pendingOrders: {
-//           $sum: { $cond: [{ $eq: ["$status", "pending"] }, 1, 0] },
-//         },
-//         paidOrders: {
-//           $sum: { $cond: [{ $eq: ["$status", "paid"] }, 1, 0] },
-//         },
-//         totalCancelledOrders: {
-//           $sum: { $cond: [{ $eq: ["$status", "cancelled"] }, 1, 0] },
-//         },
-//         srCanceledOrders: {
-//           $sum: {
-//             $cond: [
-//               {
-//                 $and: [
-//                   { $eq: ["$status", "cancelled"] },
-//                   { $eq: ["$userRole", "sr"] },
-//                 ],
-//               },
-//               1,
-//               0,
-//             ],
-//           },
-//         },
-//         customerCanceledOrders: {
-//           $sum: {
-//             $cond: [
-//               {
-//                 $and: [
-//                   { $eq: ["$status", "cancelled"] },
-//                   { $eq: ["$userRole", "customer"] },
-//                 ],
-//               },
-//               1,
-//               0,
-//             ],
-//           },
-//         },
-//         todayTotalPaidOrders: {
-//           $sum: {
-//             $cond: [
-//               {
-//                 $and: [
-//                   { $eq: ["$status", "paid"] },
-//                   {
-//                     $eq: [
-//                       {
-//                         $dateToString: {
-//                           format: "%Y-%m-%d",
-//                           date: "$createdAt",
-//                         },
-//                       },
-//                       new Date().toISOString().split("T")[0],
-//                     ],
-//                   },
-//                 ],
-//               },
-//               1,
-//               0,
-//             ],
-//           },
-//         },
-//         todayTotalCanceledOrders: {
-//           $sum: {
-//             $cond: [
-//               {
-//                 $and: [
-//                   { $eq: ["$status", "cancelled"] },
-//                   {
-//                     $eq: [
-//                       {
-//                         $dateToString: {
-//                           format: "%Y-%m-%d",
-//                           date: "$createdAt",
-//                         },
-//                       },
-//                       new Date().toISOString().split("T")[0],
-//                     ],
-//                   },
-//                 ],
-//               },
-//               1,
-//               0,
-//             ],
-//           },
-//         },
-//         todayTotalSrOrders: {
-//           $sum: {
-//             $cond: [
-//               {
-//                 $and: [
-//                   { $eq: ["$userRole", "sr"] },
-//                   {
-//                     $eq: [
-//                       {
-//                         $dateToString: {
-//                           format: "%Y-%m-%d",
-//                           date: "$createdAt",
-//                         },
-//                       },
-//                       new Date().toISOString().split("T")[0],
-//                     ],
-//                   },
-//                 ],
-//               },
-//               1,
-//               0,
-//             ],
-//           },
-//         },
-//         todayTotalCustomerOrders: {
-//           $sum: {
-//             $cond: [
-//               {
-//                 $and: [
-//                   { $eq: ["$userRole", "customer"] },
-//                   {
-//                     $eq: [
-//                       {
-//                         $dateToString: {
-//                           format: "%Y-%m-%d",
-//                           date: "$createdAt",
-//                         },
-//                       },
-//                       new Date().toISOString().split("T")[0],
-//                     ],
-//                   },
-//                 ],
-//               },
-//               1,
-//               0,
-//             ],
-//           },
-//         },
-//         customerOrders: {
-//           $sum: { $cond: [{ $eq: ["$userRole", "customer"] }, 1, 0] },
-//         },
-//         srOrders: {
-//           $sum: { $cond: [{ $eq: ["$userRole", "sr"] }, 1, 0] },
-//         },
-//         totalOrderSaleAmount: {
-//           $sum: { $ifNull: ["$totalAmount", 0] },
-//         },
-//         totalPendingSale: {
-//           $sum: {
-//             $cond: [
-//               { $eq: ["$status", "pending"] },
-//               { $ifNull: ["$totalAmount", 0] },
-//               0,
-//             ],
-//           },
-//         },
-//         totalPaidOrderSaleAmount: {
-//           $sum: {
-//             $cond: [
-//               { $eq: ["$status", "paid"] },
-//               { $ifNull: ["$totalAmount", 0] },
-//               0,
-//             ],
-//           },
-//         },
-//       },
-//     },
-//   ]);
-//   // Step 2️⃣: Aggregate nested product-level orderInfo totals (for accuracy)
-//   const nestedSummary = await OrderModel.aggregate([
-//     { $unwind: "$orderInfo" },
-//     {
-//       $group: {
-//         _id: null,
-//         totalItemsSold: { $sum: "$orderInfo.quantity" },
-//         totalProductSale: {
-//           $sum: { $ifNull: ["$orderInfo.totalAmount.total", 0] },
-//         },
-//       },
-//     },
-//   ]);
-//   // Step 3️⃣: Combine both safely
-//   return {
-//     totalOrders: rootSummary[0]?.totalOrders || 0,
-//     pendingOrders: rootSummary[0]?.pendingOrders || 0,
-//     paidOrders: rootSummary[0]?.paidOrders || 0,
-//     customerOrders: rootSummary[0]?.customerOrders || 0,
-//     canceledOrders: rootSummary[0]?.totalCancelledOrders || 0,
-//     srCanceledOrders: rootSummary[0]?.srCanceledOrders || 0,
-//     customerCanceledOrders: rootSummary[0]?.customerCanceledOrders || 0,
-//     todayTotalPaidOrders: rootSummary[0]?.todayTotalPaidOrders || 0,
-//     todayTotalCanceledOrders: rootSummary[0]?.todayTotalCanceledOrders || 0,
-//     todayTotalSrOrders: rootSummary[0]?.todayTotalSrOrders || 0,
-//     todayTotalCustomerOrders: rootSummary[0]?.todayTotalCustomerOrders || 0,
-//     srOrders: rootSummary[0]?.srOrders || 0,
-//     totalOrderSaleAmount: rootSummary[0]?.totalOrderSaleAmount || 0,
-//     totalPendingSale: rootSummary[0]?.totalPendingSale || 0,
-//     totalPaidOrderSaleAmount: rootSummary[0]?.totalPaidOrderSaleAmount || 0,
-//     totalItemsSold: nestedSummary[0]?.totalItemsSold || 0,
-//     totalProductSale: nestedSummary[0]?.totalProductSale || 0,
-//   };
-// };
 const getOrderSummaryFromDB = (_a) => __awaiter(void 0, [_a], void 0, function* ({ startDate, endDate, }) {
     var _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t;
     try {
@@ -733,83 +577,6 @@ const updateOrderInDB = (id, payload) => __awaiter(void 0, void 0, void 0, funct
     return result;
 });
 //  Update Order Status (Dedicated Route)
-// const updateOrderStatusInDB = async (id: string, status: OrderStatus) => {
-//   const order = await OrderModel.findById(id).populate("orderInfo.productInfo");
-//   if (!order) {
-//     throw new AppError(httpStatus.NOT_FOUND, "Order not found!");
-//   }
-//   if (!order.orderInfo || order.orderInfo.length === 0) {
-//     throw new AppError(httpStatus.BAD_REQUEST, "Order info is missing!");
-//   }
-//   // ✅ Update all items’ status
-//   order.orderInfo.forEach((item) => {
-//     item.status = status;
-//   });
-//   // ✅ When order is marked as PAID
-//   if (status === "paid") {
-//     for (const item of order.orderInfo) {
-//       const product = item.productInfo as any;
-//       if (product) {
-//         // 🧩 Determine which quantity field to use
-//         const orderQty =
-//           item.totalQuantity && item.totalQuantity > 0
-//             ? item.totalQuantity
-//             : item.quantity || 0;
-//         if (orderQty <= 0) {
-//           throw new AppError(
-//             httpStatus.BAD_REQUEST,
-//             `Invalid order quantity for "${
-//               product.description?.name || product.name
-//             }".`
-//           );
-//         }
-//         // 🟢 Check and reduce product stock
-//         if (product.quantity < orderQty) {
-//           throw new AppError(
-//             httpStatus.BAD_REQUEST,
-//             `Not enough stock for "${
-//               product.description?.name || product.name
-//             }". Only ${product.quantity} left.`
-//           );
-//         }
-//         // ✅ Deduct the quantity from product stock
-//         product.quantity -= orderQty;
-//         await ProductModel.findByIdAndUpdate(product._id, {
-//           quantity: product.quantity,
-//         });
-//         // 🧮 Apply commission (only once)
-//         if (!item.commission.amount && item.commission.value) {
-//           const commissionRate =
-//             item.commission.type === "percentage"
-//               ? item.commission.value / 100
-//               : 0;
-//           const commissionAmount =
-//             item.commission.type === "percentage"
-//               ? item.totalAmount.subTotal * commissionRate
-//               : item.commission.value;
-//           item.commission.amount = commissionAmount;
-//         }
-//         // 💰 Update SR’s commission balance once per paid order item
-//         if (
-//           item.orderBy?._id &&
-//           item.userRole === "sr" &&
-//           item.commission?.amount &&
-//           !item.commission.isAddedToBalance
-//         ) {
-//           await UserModel.findByIdAndUpdate(
-//             item.orderBy._id,
-//             { $inc: { commissionBalance: item.commission.amount || 0 } },
-//             { new: true }
-//           );
-//           item.commission.isAddedToBalance = true;
-//         }
-//       }
-//     }
-//   }
-//   await order.save();
-//   return order;
-// };
-// ✅ Update Order Status
 const updateOrderStatusInDB = (id, status) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     const order = yield order_model_1.OrderModel.findById(id).populate("orderInfo.productInfo");
@@ -871,6 +638,7 @@ exports.orderServices = {
     getAllOrdersFromDB,
     getSingleOrderFromDB,
     getUserCommissionSummaryFromDB,
+    getOrderByTrackingNumberFromDB,
     createOrderIntoDB,
     updateOrderStatusInDB,
     getOrderSummaryFromDB,

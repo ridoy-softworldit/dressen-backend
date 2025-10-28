@@ -1,6 +1,38 @@
 import { Schema, model } from "mongoose";
 import { TSettings } from "./settings.interface";
 
+const bKashSchema = new Schema(
+  {
+    bKashLogo: { type: String },
+    bKashNumber: { type: String },
+  },
+  { _id: false }
+);
+
+const nagadSchema = new Schema(
+  {
+    nagadLogo: { type: String },
+    nagadNumber: { type: String },
+  },
+  { _id: false }
+);
+
+const rocketSchema = new Schema(
+  {
+    rocketLogo: { type: String },
+    rocketNumber: { type: String },
+  },
+  { _id: false }
+);
+
+const upaySchema = new Schema(
+  {
+    upayLogo: { type: String },
+    upayNumber: { type: String },
+  },
+  { _id: false }
+);
+
 const settingsSchema = new Schema<TSettings>(
   {
     enableHomepagePopup: { type: Boolean, default: false },
@@ -26,6 +58,15 @@ const settingsSchema = new Schema<TSettings>(
       title: { type: String },
       description: { type: String },
     },
+
+    mobileMfs: {
+      bKash: bKashSchema,
+      nagad: nagadSchema,
+      rocket: rocketSchema,
+      upay: upaySchema,
+    },
+
+    deliveryCharge: { type: Number, default: 0 },
 
     contactAndSocial: {
       address: { type: String },

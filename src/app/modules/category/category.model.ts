@@ -32,8 +32,7 @@ const categorySchema = new Schema<TCategory>(
       required: [true, "A banner image is required to create category!"],
     },
     subCategories: {
-      type: [Schema.Types.ObjectId],
-      ref: "category",
+      type: [String],
     },
   },
   {

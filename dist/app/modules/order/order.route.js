@@ -14,6 +14,7 @@ router.get("/summary", order_controller_1.orderControllers.getOrderSummary);
 router.get("/my-order/:id", order_controller_1.orderControllers.getMyOrders);
 router.get("/:id", order_controller_1.orderControllers.getSingleOrder);
 router.get("/commission/:id", order_controller_1.orderControllers.getUserCommissionSummary);
+router.get("/track/:trackingNumber", order_controller_1.orderControllers.getOrderByTrackingNumber);
 router.post("/create-order", (0, validateRequest_1.default)(order_validation_1.createOrderZodSchema), order_controller_1.orderControllers.createOrder);
 router.patch("/status/:id", order_controller_1.orderControllers.updateOrderStatus);
 router.patch("/:id", order_controller_1.orderControllers.updateOrder);

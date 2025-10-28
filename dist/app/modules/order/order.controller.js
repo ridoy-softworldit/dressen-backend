@@ -23,7 +23,8 @@ const getAllOrder = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, vo
         success: true,
         statusCode: http_status_1.default.OK,
         message: "Orders retrieve successfully!",
-        data: result,
+        data: result.data,
+        meta: result.meta,
     });
 }));
 const getMyOrders = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -33,6 +34,19 @@ const getMyOrders = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, vo
         success: true,
         statusCode: http_status_1.default.OK,
         message: "Orders retrieved successfully!",
+        data: result,
+    });
+}));
+/**
+ * ✅ Get Order by Tracking Number (Public Route)
+ */
+const getOrderByTrackingNumber = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { trackingNumber } = req.params;
+    const result = yield order_service_1.orderServices.getOrderByTrackingNumberFromDB(trackingNumber);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: "Order retrieved successfully by tracking number!",
         data: result,
     });
 }));
@@ -146,6 +160,7 @@ exports.orderControllers = {
     getAllOrder,
     getSingleOrder,
     getUserCommissionSummary,
+    getOrderByTrackingNumber,
     createOrder,
     updateOrderStatus,
     updateOrder,

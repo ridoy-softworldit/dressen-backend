@@ -24,27 +24,86 @@ const createSettingsOnDB = (payload) => __awaiter(void 0, void 0, void 0, functi
     const result = yield settings_model_1.SettingsModel.create(payload);
     return result;
 });
-// ✅ Get Settings (Only one record)
+// ✅ Get All Settings (Only one record)
 const getSettingsFromDB = () => __awaiter(void 0, void 0, void 0, function* () {
     const result = yield settings_model_1.SettingsModel.findOne();
     return result;
 });
+// ✅ Get Logo Only
+const getLogoFromDB = () => __awaiter(void 0, void 0, void 0, function* () {
+    const settings = yield settings_model_1.SettingsModel.findOne();
+    if (!(settings === null || settings === void 0 ? void 0 : settings.logo))
+        throw new handleAppError_1.default(404, "Logo not found!");
+    return { logo: settings.logo };
+});
+// ✅ Get Slider Images Only
+const getSliderImagesFromDB = () => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const settings = yield settings_model_1.SettingsModel.findOne();
+    if (!((_a = settings === null || settings === void 0 ? void 0 : settings.sliderImages) === null || _a === void 0 ? void 0 : _a.length))
+        throw new handleAppError_1.default(404, "No slider images found!");
+    return { sliderImages: settings.sliderImages };
+});
+// ✅ Get Contact and Social Info Only
+const getContactAndSocialFromDB = () => __awaiter(void 0, void 0, void 0, function* () {
+    const settings = yield settings_model_1.SettingsModel.findOne();
+    if (!(settings === null || settings === void 0 ? void 0 : settings.contactAndSocial))
+        throw new handleAppError_1.default(404, "Contact and social info not found!");
+    return { contactAndSocial: settings.contactAndSocial };
+});
+// ✅ Get Mobile MFS Info Only
+const getMobileMfsFromDB = () => __awaiter(void 0, void 0, void 0, function* () {
+    const settings = yield settings_model_1.SettingsModel.findOne();
+    if (!(settings === null || settings === void 0 ? void 0 : settings.mobileMfs))
+        throw new handleAppError_1.default(404, "Mobile MFS info not found!");
+    return { mobileMfs: settings.mobileMfs };
+});
+// ✅ Get Delivery Charge Only (if exists)
+const getDeliveryChargeFromDB = () => __awaiter(void 0, void 0, void 0, function* () {
+    const settings = yield settings_model_1.SettingsModel.findOne();
+    if (!(settings === null || settings === void 0 ? void 0 : settings.deliveryCharge) && (settings === null || settings === void 0 ? void 0 : settings.deliveryCharge) !== 0)
+        throw new handleAppError_1.default(404, "Delivery charge not found!");
+    return { deliveryCharge: settings.deliveryCharge };
+});
 // ✅ Update Settings
 const updateSettingsOnDB = (updatedData) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
+    var _a, _b, _c, _d, _e, _f, _g;
     const settings = yield settings_model_1.SettingsModel.findOne();
     if (!settings)
         throw new handleAppError_1.default(404, "Settings not found!");
-    // Handle image deletions if needed
-    if (((_a = updatedData.deletedSliderImages) === null || _a === void 0 ? void 0 : _a.length) > 0 &&
-        ((_b = settings.sliderImages) === null || _b === void 0 ? void 0 : _b.length)) {
-        const restImages = settings.sliderImages.filter((img) => { var _a; return !((_a = updatedData.deletedSliderImages) === null || _a === void 0 ? void 0 : _a.includes(img)); });
-        const updatedSliderImages = (updatedData.sliderImages || [])
-            .filter((img) => { var _a; return !((_a = updatedData.deletedSliderImages) === null || _a === void 0 ? void 0 : _a.includes(img)); })
-            .filter((img) => !restImages.includes(img));
-        updatedData.sliderImages = [...restImages, ...updatedSliderImages];
+    // ✅ Handle slider image updates intelligently
+    if ((_a = updatedData.sliderImages) === null || _a === void 0 ? void 0 : _a.length) {
+        // Append new images to the old ones (keep max 3)
+        const oldImages = settings.sliderImages || [];
+        const newImages = updatedData.sliderImages;
+        // Remove duplicates and limit to 3
+        const mergedImages = Array.from(new Set([...oldImages, ...newImages])).slice(0, 3);
+        updatedData.sliderImages = mergedImages;
+    }
+    else {
+        // Keep existing ones if not provided
+        updatedData.sliderImages = settings.sliderImages;
+    }
+    // ✅ Handle deletedSliderImages if any
+    if (((_b = updatedData.deletedSliderImages) === null || _b === void 0 ? void 0 : _b.length) > 0) {
+        updatedData.sliderImages = (_c = settings.sliderImages) === null || _c === void 0 ? void 0 : _c.filter((img) => !updatedData.deletedSliderImages.includes(img));
+        // Delete from Cloudinary
         yield Promise.all(updatedData.deletedSliderImages.map((img) => (0, cloudinary_config_1.deleteImageFromCLoudinary)(img)));
     }
+    // ✅ Deep merge for mobileMfs
+    if (updatedData.mobileMfs) {
+        updatedData.mobileMfs = {
+            bKash: Object.assign(Object.assign({}, (((_d = settings.mobileMfs) === null || _d === void 0 ? void 0 : _d.bKash) || {})), (updatedData.mobileMfs.bKash || {})),
+            nagad: Object.assign(Object.assign({}, (((_e = settings.mobileMfs) === null || _e === void 0 ? void 0 : _e.nagad) || {})), (updatedData.mobileMfs.nagad || {})),
+            rocket: Object.assign(Object.assign({}, (((_f = settings.mobileMfs) === null || _f === void 0 ? void 0 : _f.rocket) || {})), (updatedData.mobileMfs.rocket || {})),
+            upay: Object.assign(Object.assign({}, (((_g = settings.mobileMfs) === null || _g === void 0 ? void 0 : _g.upay) || {})), (updatedData.mobileMfs.upay || {})),
+        };
+    }
+    // ✅ Deep merge for contactAndSocial
+    if (updatedData.contactAndSocial) {
+        updatedData.contactAndSocial = Object.assign(Object.assign({}, (settings.contactAndSocial || {})), (updatedData.contactAndSocial || {}));
+    }
+    // ✅ Update document
     const result = yield settings_model_1.SettingsModel.findOneAndUpdate({}, updatedData, {
         new: true,
         runValidators: true,
@@ -54,5 +113,10 @@ const updateSettingsOnDB = (updatedData) => __awaiter(void 0, void 0, void 0, fu
 exports.settingsServices = {
     createSettingsOnDB,
     getSettingsFromDB,
+    getLogoFromDB,
+    getSliderImagesFromDB,
+    getContactAndSocialFromDB,
+    getMobileMfsFromDB,
+    getDeliveryChargeFromDB,
     updateSettingsOnDB,
 };
